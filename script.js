@@ -1,73 +1,135 @@
 <script>
-// Function to get DOM structure with key styles
-function getDOMStructure(element = document.body, level = 0) {
+// Function to get DOM structure with CSS and media queries
+function getDOMStructureWithCSS(element = document.body, level = 0) {
     let structure = '';
     const indent = '  '.repeat(level);
-    
-    // Get element details
     const classes = Array.from(element.classList).join('.');
     const id = element.id ? `#${element.id}` : '';
     const tag = element.tagName.toLowerCase();
     
-    // Build element string
-    structure += `${indent}${tag}${id}${classes ? `.${classes}` : ''}\n`;
-    
     // Get computed styles
     const styles = window.getComputedStyle(element);
-    const display = styles.getPropertyValue('display');
-    const position = styles.getPropertyValue('position');
-    const width = styles.getPropertyValue('width');
-    const height = styles.getPropertyValue('height');
+    const relevantStyles = [
+        'display', 'position', 'width', 'height', 'margin', 'padding',
+        'background', 'color', 'font-size', 'flex', 'grid',
+        'border', 'border-radius', 'box-shadow', 'transform'
+    ];
     
-    // Add styles indented
-    const styleIndent = indent + '  ';
-    structure += `${styleIndent}display: ${display};\n`;
-    structure += `${styleIndent}position: ${position};\n`;
-    structure += `${styleIndent}width: ${width};\n`;
-    structure += `${styleIndent}height: ${height};\n`;
+    const styleString = relevantStyles
+        .filter(prop => styles.getPropertyValue(prop))
+        .map(prop => `${prop}: ${styles.getPropertyValue(prop)};`)
+        .join(' ');
+
+    // Get responsive styles
+    const breakpoints = [
+        { width: 991, name: 'Tablet' },
+        { width: 767, name: 'Mobile Landscape' },
+        { width: 479, name: 'Mobile Portrait' }
+    ];
+
+    // Build element string
+    structure += `${indent}${tag}${id}${classes ? `.${classes}` : ''} {\n`;
+    structure += `${indent}  /* Desktop styles */\n`;
+    structure += `${indent}  ${styleString}\n`;
     
-    // Process children
-    Array.from(element.children).forEach(child => {
-        structure += getDOMStructure(child, level + 1);
+    // Add media queries
+    breakpoints.forEach(bp => {
+        structure += `${indent}  /* ${bp.name} styles */\n`;
+        structure += `${indent}  @media (max-width: ${bp.width}px) {\n`;
+        structure += `${indent}    /* Add breakpoint-specific styles here */\n`;
+        structure += `${indent}  }\n`;
     });
     
+    structure += `${indent}}\n\n`;
+
+    // Process children
+    Array.from(element.children).forEach(child => {
+        structure += getDOMStructureWithCSS(child, level + 1);
+    });
+
     return structure;
+}
+
+// Function to copy text to clipboard
+function copyToClipboard(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        const button = document.getElementById('copyButton');
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+            button.textContent = 'Copy to Clipboard';
+        }, 2000);
+    } catch (err) {
+        console.error('Failed to copy:', err);
+    }
+    document.body.removeChild(textarea);
 }
 
 // Output structure when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    const structure = getDOMStructure();
-    console.log('DOM Structure with Styles:');
+    const structure = getDOMStructureWithCSS();
+    console.log('DOM Structure with CSS:');
     console.log(structure);
-    
-    // Create a pre element to display the structure on the page
-    const pre = document.createElement('pre');
-    pre.style.cssText = 'position: fixed; top: 10px; right: 10px; background: white; color: black; padding: 20px; border: 1px solid #ccc; max-height: 80vh; overflow: auto; z-index: 9999;';
-    pre.textContent = structure;
-    
-    // Create copy button
+
+    // Create container for the window
+    const container = document.createElement('div');
+    container.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 50vw;
+        height: 80vh;
+        background: white;
+        padding: 20px;
+        border: 1px solid #ccc;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        z-index: 999999999;
+        display: flex;
+        flex-direction: column;
+    `;
+
+    // Create and style the copy button
     const copyButton = document.createElement('button');
-    copyButton.textContent = '📋';
-    copyButton.title = 'Copy to clipboard';
-    copyButton.style.cssText = 'position: absolute; top: 5px; right: 5px; background: none; border: none; font-size: 16px; cursor: pointer;';
-    
-    // Add click event to copy text to clipboard
-    copyButton.addEventListener('click', () => {
-        navigator.clipboard.writeText(pre.textContent).then(() => {
-            copyButton.textContent = 'Copied!';
-            setTimeout(() => {
-                copyButton.textContent = '📋';
-            }, 2000);
-        }).catch(err => {
-            console.error('Failed to copy: ', err);
-            alert('Failed to copy to clipboard.');
-        });
-    });
-    
-    // Append button to pre
-    pre.appendChild(copyButton);
-    
-    // Append pre to body
-    document.body.appendChild(pre);
+    copyButton.id = 'copyButton';
+    copyButton.textContent = 'Copy to Clipboard';
+    copyButton.style.cssText = `
+        margin-bottom: 10px;
+        padding: 8px 16px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        z-index: 999999999;
+    `;
+    copyButton.onclick = () => copyToClipboard(structure);
+
+    // Create and style the pre element
+    const pre = document.createElement('pre');
+    pre.id = 'structureWindow';
+    pre.style.cssText = `
+        flex: 1;
+        overflow: auto;
+        margin: 0;
+        padding: 10px;
+        background: white;
+        color: black;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    `;
+    pre.textContent = structure;
+
+    // Append elements
+    container.appendChild(copyButton);
+    container.appendChild(pre);
+    document.body.appendChild(container);
 });
 </script>
